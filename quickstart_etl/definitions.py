@@ -90,7 +90,7 @@ def test_success_sensor(context):
 
 @sensor(jobs=[simple_config_job])
 def test_skip_sensor(context):
-    yield SkipReason(f"No s3 updates found for bucket {aa}.")
+    yield SkipReason(f"No s3 updates found for bucket.")
     return
 
 @sensor(jobs=[simple_config_job])
