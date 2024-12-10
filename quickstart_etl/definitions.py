@@ -3,6 +3,12 @@ from pathlib import Path
 from dagster import (
     Definitions,
     ScheduleDefinition,
+    sensor,
+    job,
+    SkipReason,
+    schedule,
+    ScheduleEvaluationContext,
+    RunRequest,
     define_asset_job,
     graph_asset,
     link_code_references_to_git,
@@ -46,7 +52,123 @@ my_assets = link_code_references_to_git(
     ),
 )
 
+
+
+@op(
+    config_schema={"num": int},
+)
+def requires_config(context):
+    return context.op_config
+
+
+@job(
+    tags={
+        "dagster-k8s/config": {
+            "container_config": {
+                "resources": {
+                    "requests": {"cpu": "3"},
+                },
+            }
+        }
+    },
+)
+def simple_config_job():
+    requires_config()
+
+
+@sensor(jobs=[simple_config_job])
+def test_success_sensor(context):
+    cursor = context.cursor if context.cursor else 0
+    context.update_cursor(str(int(cursor) + 1))
+    for i in range(3):
+        yield RunRequest(
+            run_key=str(i),
+            job_name=simple_config_job.name,
+            run_config={"ops": {"requires_config": {"config": {"num": 0}}}},
+            tags={"fee": "fifofum"},
+        )
+
+@sensor(jobs=[simple_config_job])
+def test_skip_sensor(context):
+    yield SkipReason(f"No s3 updates found for bucket {aa}.")
+    return
+
+@sensor(jobs=[simple_config_job])
+def test_error_sensor(context):
+    raise Exception(
+        "S3 bucket not specified at environment variable `DAGSTER_TOY_SENSOR_S3_BUCKET`."
+    )
+
+@sensor(jobs=[simple_config_job])
+def test_timeout_sensor(context):
+    import time
+    time.sleep(80)
+    raise Exception(
+        "S3 bucket not specified at environment variable `DAGSTER_TOY_SENSOR_S3_BUCKET`."
+    )
+
+@schedule("* * * * *", job=simple_config_job)
+def test_success_schedule():
+    for i in range(2):
+        yield RunRequest(
+            run_key=str(i),
+        run_config={"ops": {"the_op": {"config": {"foo": "bar"}}}},
+        tags={"fee": "fifofum"},
+    )
+        
+@schedule("* * * * *", job=simple_config_job)
+def test_exception_schedule(context: ScheduleEvaluationContext):
+    tick_time = context.scheduled_execution_time  # Access the tick time
+    if tick_time is not None:  # This should always be available for schedules
+        tick_minute = tick_time.minute
+        if tick_minute % 2 == 1:
+            raise Exception(f"Exception at tick time: {tick_time}")
+        return RunRequest(
+            job_name=simple_config_job.name,
+            run_key="1",
+            run_config={"ops": {"requires_config": {"config": {"num": "1"}}}},
+            tags={"fee": "fifofum"},
+        )
+
+@schedule("* * * * *", job=simple_config_job)
+def test_skip_schedule(context: ScheduleEvaluationContext):
+    tick_time = context.scheduled_execution_time  # Access the tick time
+    if tick_time is not None:  # This should always be available for schedules
+        tick_minute = tick_time.minute
+        if tick_minute % 2 == 1:
+            yield SkipReason("A skip reason.")
+            return
+        return RunRequest(
+            job_name=simple_config_job.name,
+            run_key="1",
+            run_config={"ops": {"requires_config": {"config": {"num": "1"}}}},
+            tags={"fee": "fifofum"},
+        )
+
+
+@schedule("* * * * *", job=simple_config_job)
+def test_timeout_schedule(context: ScheduleEvaluationContext):
+    tick_time = context.scheduled_execution_time  # Access the tick time
+    if tick_time is not None:  # This should always be available for schedules
+        tick_minute = tick_time.minute
+        if tick_minute % 2 == 1:
+            import time
+            time.sleep(80)
+            return
+        return RunRequest(
+            job_name=simple_config_job.name,
+            run_key="1",
+            run_config={"ops": {"requires_config": {"config": {"num": "1"}}}},
+            tags={"fee": "fifofum"},
+        )
+
+
+
+
+
 defs = Definitions(
     assets=my_assets,
-    schedules=[daily_refresh_schedule],
+    schedules=[test_success_schedule, test_exception_schedule, test_skip_schedule, test_timeout_schedule],
+    sensors=[test_success_sensor, test_skip_sensor, test_error_sensor, test_timeout_sensor]
 )
+
