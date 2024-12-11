@@ -111,10 +111,11 @@ def test_timeout_sensor(context):
 def test_success_schedule():
     for i in range(2):
         yield RunRequest(
+            job_name=simple_config_job.name,
             run_key=str(i),
-        run_config={"ops": {"the_op": {"config": {"foo": "bar"}}}},
-        tags={"fee": "fifofum"},
-    )
+            run_config={"ops": {"the_op": {"config": {"foo": "bar"}}}},
+            tags={"fee": "fifofum"},
+        )
         
 @schedule("* * * * *", job=simple_config_job)
 def test_exception_schedule(context: ScheduleEvaluationContext):
