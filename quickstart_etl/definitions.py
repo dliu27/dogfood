@@ -102,7 +102,8 @@ def test_error_sensor(context):
 @sensor(jobs=[simple_config_job])
 def test_timeout_sensor(context):
     import time
-    time.sleep(80)
+    time.sleep(150)
+    return
     raise Exception(
         "S3 bucket not specified at environment variable `DAGSTER_TOY_SENSOR_S3_BUCKET`."
     )
