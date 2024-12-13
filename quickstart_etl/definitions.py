@@ -113,7 +113,7 @@ def test_success_schedule():
         yield RunRequest(
             job_name=simple_config_job.name,
             run_key=str(i),
-            run_config={"ops": {"the_op": {"config": {"foo": "bar"}}}},
+            run_config={"ops": {"requires_config": {"config": {"num": 0}}}},
             tags={"fee": "fifofum"},
         )
         
