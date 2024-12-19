@@ -3,6 +3,7 @@ from pathlib import Path
 from dagster import (
     Definitions,
     ScheduleDefinition,
+    SensorEvaluationContext,
     sensor,
     job,
     SkipReason,
@@ -165,12 +166,30 @@ def test_timeout_schedule(context: ScheduleEvaluationContext):
         )
 
 
+@op
+def set_up_job_run(
+    context,
+):
+    pass
 
 
+@job
+def my_job():
+    set_up_job_run()
+
+
+@sensor(
+    job=my_job,
+    minimum_interval_seconds=5,
+)
+def process_new_event_for_social_listening(
+    context: SensorEvaluationContext,
+):
+    yield RunRequest()
 
 defs = Definitions(
     assets=my_assets,
     schedules=[test_success_schedule, test_exception_schedule, test_skip_schedule, test_timeout_schedule],
-    sensors=[test_success_sensor, test_skip_sensor, test_error_sensor, test_timeout_sensor]
+    sensors=[test_success_sensor, test_skip_sensor, test_error_sensor, test_timeout_sensor, process_new_event_for_social_listening]
 )
 
