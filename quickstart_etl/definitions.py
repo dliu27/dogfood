@@ -170,7 +170,7 @@ def test_timeout_schedule(context: ScheduleEvaluationContext):
 def set_up_job_run(
     context,
 ):
-    pass
+    return 10
 
 
 @job
